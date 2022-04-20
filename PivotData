@@ -15,7 +15,7 @@ The emergence of `tidyr::pivot_longer` and `tidyr::pivot_wider` have helped reti
 The pivot functions allow us to modify data sets. Using `pivot_wider` we can extend data sets to have more columns and less rows. 
 The `pivot_wider` function are squishing vertically and stretching horizontally. 
 While `pivot_longer` we can stretch the dataset vertically and squish it horizontally. 
-Below we will see examples of how these functions work, and why the work better than the predecessors using data sets provided in TidyTuesday.  
+Below we will see examples of how these functions work, and why they work better than the predecessors. We will be using data sets provided in AZTidyTuesday from April of 2022.  
 
 ## Pivot Longer
 
