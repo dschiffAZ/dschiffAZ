@@ -1,0 +1,126 @@
+---
+title: "randomForest"
+author: "Daniel Schiff"
+date: "`r format(Sys.Date(),'%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Random Forest Models
+
+https://cran.r-project.org/web/packages/randomForest/randomForest.pdf
+
+In R, we have the ability to use machine learning modeling to help find solutions. In this blog, I will discuss why we use random forest and how to use it in R. In this case we are going to use `readkSills` data found in the `party` package. Random forest models are a group of random decisions trees (hence the forest) that create predictions. Why do we use random forest modeling? We use random forest modeling because of the ability to classify or regress data depending on the structure of the y-variable. 
+
+#### Package Input
+
+First step in setting up random forest models is getting the packages set up. The first package I install is `randomForest`, this package allows us to run a Breiman and Cutler's random forest model. As stated above, the random forest model is used for both classifications and regression. Within the package we can extract single trees from a forest, variables importance measures, as well as imputations of missing values. The other packages that we will use are `tidyverse` and `caret`. `tidyverse` is used for data cleaning and manipulation.`caret` is used for classification and regression training. We use it here for data partitioning. 
+
+```{r, warning = F, message=F}
+
+## Require the Package needed to perform the model
+require(randomForest)
+require(tidyverse)
+require(caret)
+```
+
+## Data Set Up
+
+In order to explain how to use random forest models, we will use the data set `party::readingSkills`. When running models I train them and then test them to minimize the effects of discrepancies in the data. It allows you to make predictions of the model against the test data set. Validating the models accuracy. Also when working in R, and on any type of sampling, we must set a seed using `set.seed()` to allow for reproducibility. 
+
+```{r}
+##Upload the data set
+df <- party::readingSkills
+
+#Set the Seed because we would want the results to be reproducible. random forest use a sample of the data sets. Setting the seeds keeps a constant in the sample.
+set.seed(821)
+
+#Partition the data set
+index <- createDataPartition(df$score, p = .66, list = FALSE, times = 1)
+train <- df[index,]
+test <- df[-index,]
+
+```
+
+## The Model 
+
+Random forest model have the ability of being both regression(numeric) or classification(character or factorial) predictors.  We must understand what inputs we are adding when creating the model to ensure the model runs the way we plan it to. This can include looking at the data structure for the  Within R, we also need to keep in mind the arguments we input into the function. Through this code chunk, I show off the more common arguments that are used, when the data set is completed. Other important arguments that are popular, `na.action = ` and `classwt`. First, we will run a basic model no arguments outside the formula and the data set. **Notice:** the results out of number of trees = 500 and number of variables tried at each split = 1. It also gives, mean of squared residuals and % of variability explained (similar to `r^2`). Next, we will add a specific number of trees (512) and a specific number of variables (3). Then we try to find the optimal number of variables at each split using the `tuneRF()` function. Finally, we add importance and put the entire model together. 
+
+_Side note: The crf model is an example of using classification rather than regression and how they differ._
+
+```{r, fig.show='hide'}
+
+##The Basics of the `randomForest` function:
+
+#In the `randomForest`() function we have a multitude of arguments that we need to check on. 
+#The formula
+rf <- randomForest(score~., data = train) # Here we tell the model, to predict the value of score (aka the y), and predict it from all the other variables (the use of the period "."). We also need to add train, which is the data frame we are using.
+print(rf)
+#Adding number of trees and number of variables randomly sampled as candidates at each split. 
+rf <- randomForest(score ~ ., ntree = 512, mtry = 3, data = train) #Here we tell the model to have 512 trees, I usually have trees in powers of 2 values. But that is a personal preference. mtry = 3 which tells the model to randomly sample  three variables as candidates to split. 
+print(rf)
+#Finding the perfect amount of of variables
+mtry <- tuneRF(train[-1],train$score, ntreeTry=512,
+               stepFactor=1.5,improve=0.01, trace=TRUE, plot=TRUE)
+
+best.m <- mtry[mtry[, 2] == min(mtry[, 2]), 1]
+
+print(mtry)
+
+print(best.m)
+
+#Adding Importance
+rf <- randomForest(score ~ ., ntree = 512, mtry = best.m, train, importance = TRUE) # Importance allows us to see if the variables matter, and if we should drop any and what we cannot drop
+
+crf <- randomForest(as.factor(age) ~., df)
+```
+
+#### Plot Importance
+
+Plotting the importance allows for the user to see what is important to the model. In the case of this model, it is important to regression testing using Mean Squared Error and Node Purity (Residual of Sum of Squares). In Classification, importance is OOB (Out of Bag) error and Mean Decrease Accuracy. Node Purity in classification random forest is measured by the Gini index (0-1 or 0% - 100%).
+
+_Note: Percentages in the case of the results_
+
+```{r}
+print(rf)
+round(importance(rf)) #Notice the output
+varImpPlot(rf) # Plot the importance
+
+print(crf)
+round(importance(crf)) #Notice the output
+varImpPlot(crf) #Notice the plot
+
+```
+
+
+#Train and Test the Model
+
+After going step by step through the model, we now want to put the pieces together. First we will start with training the complete model to the _train_ data set. Once we train it we then use the trained model to predict the testing data set. Typically the testing data set is between 20-40 % of the the data. In this case the test data is 33%. Once we test it, I like to look through the residuals. so I create a column, called "resid". I also typically look at a histogram of the residuals to see if the distribution is a normal-esque curve. Following the histogram, my final step is to look at where the number of trees is optimal in the error. In the case of this data set, I looked between 16 and 4096 (`2^4 to 2^12`).
+
+```{r}
+
+rf <- randomForest(score ~ ., ntree = 256, mtry = best.m, data = train, importance = TRUE)
+print(rf)
+
+
+predTrain <- predict(rf, train)
+predTest <- predict(rf, test)
+
+tdf <- df %>%
+  mutate(pred = predict(rf, df), 
+         resid = score - pred)
+
+hist(tdf$resid)
+
+for(i in 2^c(4:12)){
+  rf <- randomForest(score ~ ., train, ntree = i, mtry = 2)
+rf
+
+plot(rf) + title(sub = i)
+}
+
+```
+
