@@ -21,6 +21,8 @@ Why do we use random forest modeling? We use random forest modeling because of t
 
 #### Package Input
 
+**Note:** _All these packages are available and already installed on the SCP RStudio R 4.0.2 installation._
+
 First step in setting up random forest models is getting the packages set up. 
 The first package I install is `randomForest`, this package allows us to run a Breiman and Cutler's random forest model.
 As stated above, the random forest model is used for both classifications and regression. 
@@ -40,20 +42,20 @@ require(caret)
 ## Data Set Up
 
 In order to explain how to use random forest models, we will use the data set `party::readingSkills`. 
-When running models I train them and then test them to minimize the effects of discrepancies in the data. 
-It allows you to make predictions of the model against the test data set. 
-Validating the models accuracy. 
+When running models I train and then test the model to minimize the effects of discrepancies in the data. 
+It allows you to make predictions of the model against the test data set and validating the model's accuracy. 
 Also when working in R, and on any type of sampling, we must set a seed using `set.seed()` to allow for reproducibility. 
 
 ```{r}
 ##Upload the data set
 df <- party::readingSkills
 
+head(df)
 #Set the Seed because we would want the results to be reproducible. random forest use a sample of the data sets. Setting the seeds keeps a constant in the sample.
 set.seed(821)
 
 #Partition the data set
-index <- createDataPartition(df$score, p = .66, list = FALSE, times = 1)
+index <- createDataPartition(df$score, p = .67, list = FALSE, times = 1)
 train <- df[index,]
 test <- df[-index,]
 
@@ -63,9 +65,10 @@ test <- df[-index,]
 
 Random forest model have the ability of being both regression(numeric) or classification(character or factorial) predictors.  
 We must understand what inputs we are adding when creating the model to ensure the model runs the way we plan it to.
-This can include looking at the data structure for the within R, we also need to keep in mind the arguments we input into the function. 
+This can include looking at the data structure for the the format of each variable. 
+Within R, we also need to keep in mind the arguments we input into the function. 
 Through this code chunk, I show off the more common arguments that are used, when the data set is completed. 
-Other important arguments that are popular, `na.action = ` and `classwt`. 
+Other important arguments that are popular, but are not used in this example are `na.action = ` and `classwt`. 
 First, we will run a basic model no arguments outside the formula and the data set. 
 **Notice:** the results out of number of trees = 500 and number of variables tried at each split = 1. 
 It also gives, mean of squared residuals and % of variability explained (similar to `r^2`). 
@@ -109,6 +112,12 @@ In the case of this model, it is important to regression testing using Mean Squa
 In Classification, importance is OOB (Out of Bag) error and Mean Decrease Accuracy. 
 Node Purity in classification random forest is measured by the Gini index (0-1 or 0% - 100%).
 
+**Notice:** The print output shows the formula, the type of random forest(regression or classification), number of trees used, and numbers of variables tried to split. In a regression model, we will see the mean of squared residuals and the % variability explained. In a classification model, we see OOB (out of bag error rate) and a confusion matrix which examines what was correct and where it missed. 
+
+**Notice:** Importance for a regression model displays MSE% and NodePurity. MSE% shows how much our model accuracy decreases if we leave out a variable. The higher the MSE% the more important the variable is to the model. NodePurity, is the measure of variable importance based on the Gini Impurity Index. The higher the value the more important the variable is to the model. 
+
+**Notice:** Importance for a classification model displays MeanDecreaseGini. Similar to the above the higher the number the more important the variable is to the model. This can be noticed by the output or the plots. 
+
 _Note: Percentages in the case of the results_
 
 ```{r}
@@ -123,16 +132,20 @@ varImpPlot(crf) #Notice the plot
 ```
 
 
-#Train and Test the Model
+## Train and Test the Model
 
 After going step by step through the model, we now want to put the pieces together. 
 First we will start with training the complete model to the _train_ data set. 
-Once we train it we then use the trained model to predict the testing data set. 
 Typically the testing data set is between 20-40 % of the the data. In this case the test data is 33%.
+ 
+
+Once we train it we then use the trained model to predict the testing data set.
 Once we test it, I like to look through the residuals. so I create a column, called "resid". 
-I also typically look at a histogram of the residuals to see if the distribution is a normal-esque curve. 
-Following the histogram, my final step is to look at where the number of trees is optimal in the error.
-In the case of this data set, I looked between 16 and 4096 (`2^4 to 2^12`).
+Typically I look at a histogram of the residuals to see if the distribution is a normal-esque curve.
+
+Using the predictions and the importance we can draw conclusions on whether the model is effective, and why observations are predicted in a certain way. 
+From these predictions and analysis, we can draw conclusions on if the model can be used on missing data or on future data, or if the model is not effective enough to help out. 
+In this data set we can make a conclusion that age and native speakers variables have an impact on the score. The older and if they are a native speaker, they will have a higher score. Which is why when predicted the top 13 prediction scores are the oldest (11-years-old), and native speakers. The lowest scores are the youngest (5-years-old) and non-native speakers. 
 
 ```{r}
 
@@ -148,13 +161,26 @@ tdf <- df %>%
          resid = score - pred)
 
 hist(tdf$resid)
+```
+
+
+## Looking for Number of Tree 
+
+Following the histogram and predictions, my final step is to look at where the number of trees is optimal in the error.
+In the case of this data set, I looked between 16 and 4096 (`2^4 to 2^12`). 
+When looking for the lowest error, we can estimate it is 256, or around there when the curve begins to flatline.  
+
+_Note: Change in y-axis in the plots_.
+
+```{r}
 
 for(i in 2^c(4:12)){
-  rf <- randomForest(score ~ ., train, ntree = i, mtry = 2)
-rf
-
-plot(rf) + title(sub = i)
+  loop <- randomForest(score ~ ., train, ntree = i, mtry = best.m)
+  print(loop)
+  plot(loop, ylim = c(3, 10)) + title(sub = i)
 }
+
+#randomForest::getTree(rf)
 
 ```
 
